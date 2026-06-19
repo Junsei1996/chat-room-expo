@@ -5,15 +5,23 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const settings = [
-  { title: "Notifications", icon: "notifications-outline" },
-  { title: "Theme", icon: "color-palette-outline" },
-  { title: "Privacy", icon: "shield-checkmark-outline" },
-  { title: "Help", icon: "help-circle-outline" },
+  {
+    title: "Notifications",
+    icon: "notifications-outline",
+    route: "/notifications",
+  },
+  { title: "Theme", icon: "color-palette-outline", route: "/theme" },
+  { title: "Privacy", icon: "shield-checkmark-outline", route: "/privacy" },
+  { title: "Help", icon: "help-circle-outline", route: "/help" },
 ];
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
+
+  if (loading) {
+    return null;
+  }
 
   if (!user) {
     router.replace("/login");
@@ -61,6 +69,7 @@ export default function ProfileScreen() {
             <Pressable
               key={item.title}
               style={styles.settingItem}
+              onPress={() => router.push(item.route as any)}
               android_ripple={{ color: "rgba(255,255,255,0.08)" }}
             >
               <View style={styles.settingIcon}>

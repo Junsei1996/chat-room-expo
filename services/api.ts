@@ -4,14 +4,14 @@ import { Platform } from "react-native";
 
 const LOCAL_API =
   Platform.OS === "android"
-    ? "http://192.168.0.100:4000" // Android emulator
+    ? "http://192.168.0.105:4000" // Android emulator
     : __DEV__
-      ? "http://192.168.0.100:4000" // Development on simulator/web
-      : "http://192.168.0.100:4000"; // Production or physical device - CHANGE THIS TO YOUR MACHINE'S IP
+      ? "http://192.168.0.105:4000" // Development on simulator/web
+      : "http://192.168.0.105:4000"; // Production or physical device - CHANGE THIS TO YOUR MACHINE'S IP
 export const API_BASE_URL = LOCAL_API;
 
 export const api = create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/api`,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
@@ -52,21 +52,26 @@ export type RoomCreateInput = {
   privacy: RoomPrivacy;
 };
 
+export type MessageUser = {
+  id: string;
+  name: string;
+  username?: string;
+};
+
 export type Message = {
   id: string;
   roomId: string;
-  senderId: string;
-  senderName: string;
-  senderInitials: string;
-  text?: string;
-  image?: string;
+  userId: string;
+  content?: string | null;
+  imageUrl?: string | null;
+  type: "text" | "image";
   createdAt: string;
-  sentAt: string;
-  isCurrentUser: boolean;
+  user: MessageUser;
+  isCurrentUser?: boolean;
 };
 
 export async function loginRequest(email: string, password: string) {
-  const response = await api.post("/api/auth/login", { email, password });
+  const response = await api.post("/auth/login", { email, password });
   return response.data as { user: User; token: string };
 }
 
@@ -75,7 +80,7 @@ export async function registerRequest(
   email: string,
   password: string,
 ) {
-  const response = await api.post("/api/auth/register", {
+  const response = await api.post("/auth/register", {
     name,
     email,
     password,
@@ -87,40 +92,28 @@ export async function getRooms(search?: string, category?: string) {
   const params = new URLSearchParams();
   if (search) params.set("search", search);
   if (category && category !== "All") params.set("category", category);
-  const response = await api.get(`/api/rooms?${params.toString()}`);
+  const response = await api.get(`/rooms?${params.toString()}`);
   return response.data as Room[];
 }
 
 export async function getRoomById(roomId: string) {
-  const response = await api.get(`/api/rooms/${roomId}`);
+  const response = await api.get(`/rooms/${roomId}`);
   return response.data as Room;
 }
 
 export async function getRoomByCode(code: string) {
-  const response = await api.get(`/api/rooms/code/${encodeURIComponent(code)}`);
+  const response = await api.get(`/rooms/code/${encodeURIComponent(code)}`);
   return response.data as Room;
 }
 
 export async function createRoom(data: RoomCreateInput) {
-  const response = await api.post("/api/rooms", data);
+  const response = await api.post("/rooms", data);
   return response.data as Room;
 }
 
-export type ServerMessage = {
-  id: string;
-  roomId: string;
-  senderId: string;
-  senderName: string;
-  text?: string;
-  image?: string;
-  createdAt: string;
-};
-
-export async function getRoomMessages(
-  roomId: string,
-): Promise<Omit<ServerMessage, "senderInitials">[]> {
-  const response = await api.get(`/api/rooms/${roomId}/messages`);
-  return response.data as Omit<ServerMessage, "senderInitials">[];
+export async function getRoomMessages(roomId: string) {
+  const response = await api.get(`/rooms/${roomId}/messages`);
+  return response.data as Message[];
 }
 
 export async function uploadImage(uri: string) {
@@ -134,7 +127,7 @@ export async function uploadImage(uri: string) {
     type: fileType,
   } as any);
 
-  const response = await api.post("/api/upload", formData, {
+  const response = await api.post("/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },

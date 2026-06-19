@@ -2,6 +2,7 @@ import { useAuth } from "@/context/auth-context";
 import { createRoom, getRooms, Room, RoomCreateInput } from "@/services/api";
 import React, {
     createContext,
+    useCallback,
     useContext,
     useEffect,
     useMemo,
@@ -23,41 +24,45 @@ export function ChatDataProvider({ children }: { children: React.ReactNode }) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const refreshRooms = async (search?: string, category?: string) => {
-    if (!token) {
-      setRooms([]);
-      return;
-    }
+  const refreshRooms = useCallback(
+    async (search?: string, category?: string) => {
+      if (!token) {
+        setRooms([]);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const data = await getRooms(search, category);
-      setRooms(data);
-    } catch (error) {
-      console.warn("Error loading rooms", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setLoading(true);
+      try {
+        const data = await getRooms(search, category);
+        setRooms(data);
+      } catch (error) {
+        console.warn("Error loading rooms", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token],
+  );
 
-  const addRoom = async (room: RoomCreateInput) => {
+  const addRoom = useCallback(async (room: RoomCreateInput) => {
     const createdRoom = await createRoom(room);
     setRooms((current) => [createdRoom, ...current]);
-  };
+  }, []);
 
   useEffect(() => {
     if (token) {
       refreshRooms();
     }
-  }, [token]);
+  }, [token, refreshRooms]);
 
-  const findRoomById = (id: string) => {
-    return rooms.find((room) => room.id === id);
-  };
+  const findRoomById = useCallback(
+    (id: string) => rooms.find((room) => room.id === id),
+    [rooms],
+  );
 
   const value = useMemo(
     () => ({ rooms, loading, refreshRooms, addRoom, findRoomById }),
-    [rooms, loading],
+    [rooms, loading, refreshRooms, addRoom, findRoomById],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

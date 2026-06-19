@@ -1,12 +1,51 @@
-import { Message } from "@/data/mock-chat";
 import { Image, StyleSheet, Text, View } from "react-native";
 
-type MessageBubbleProps = {
-  message: Message;
+type ChatMessage = {
+  id: string;
+  roomId: string;
+  userId: string;
+  content?: string | null;
+  imageUrl?: string | null;
+  type: "text" | "image";
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    username?: string;
+  };
+  isCurrentUser?: boolean;
 };
 
+type MessageBubbleProps = {
+  message: ChatMessage;
+};
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+}
+
+function formatTimestamp(value: string) {
+  try {
+    return new Date(value).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return value;
+  }
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
-  const isCurrentUser = message.isCurrentUser;
+  const isCurrentUser = message.isCurrentUser ?? false;
+  const initials = getInitials(message.user.name);
+  const text = message.content;
+  const timestamp = formatTimestamp(message.createdAt);
+
   return (
     <View
       style={[
@@ -21,20 +60,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         ]}
       >
         {!isCurrentUser ? (
-          <Text style={styles.sender}>{message.senderName}</Text>
+          <Text style={styles.sender}>{message.user.name}</Text>
         ) : null}
-        {message.text ? (
+        {message.type === "text" && text ? (
           <Text
             style={[
               styles.messageText,
               isCurrentUser ? styles.textRight : styles.textLeft,
             ]}
           >
-            {message.text}
+            {text}
           </Text>
         ) : null}
-        {message.image ? (
-          <Image source={{ uri: message.image }} style={styles.messageImage} />
+        {message.type === "image" && message.imageUrl ? (
+          <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
         ) : null}
         <Text
           style={[
@@ -42,7 +81,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             isCurrentUser ? styles.timestampRight : styles.timestampLeft,
           ]}
         >
-          {message.sentAt}
+          {timestamp}
         </Text>
       </View>
       <View
@@ -51,7 +90,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           isCurrentUser ? styles.avatarRight : styles.avatarLeft,
         ]}
       >
-        <Text style={styles.avatarText}>{message.senderInitials}</Text>
+        <Text style={styles.avatarText}>{initials}</Text>
       </View>
     </View>
   );

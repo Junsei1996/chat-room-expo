@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ChatInputProps = {
   value: string;
@@ -15,9 +16,10 @@ export function ChatInput({
   onAttach,
 }: ChatInputProps) {
   const canSend = value.trim().length > 0;
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: 16 + insets.bottom }]}> 
       <View style={styles.inputCard}>
         <Pressable
           style={styles.attachButton}

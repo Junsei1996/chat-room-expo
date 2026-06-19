@@ -87,12 +87,17 @@ export async function getRoomMessages(req: Request, res: Response) {
   return res.json(
     messages.map((message) => ({
       id: message.id,
-      text: message.text,
-      image: message.image,
       roomId: message.roomId,
-      senderId: message.senderId,
-      senderName: message.sender.name,
+      userId: message.senderId,
+      content: message.text,
+      imageUrl: message.image,
+      type: message.image ? "image" : "text",
       createdAt: message.createdAt,
+      user: {
+        id: message.sender.id,
+        name: message.sender.name,
+        email: message.sender.email,
+      },
     })),
   );
 }

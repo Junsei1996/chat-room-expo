@@ -1,66 +1,201 @@
 import { ChatInput } from "@/components/ui/ChatInput";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Header } from "@/components/ui/Header";
 import { MessageBubble } from "@/components/ui/MessageBubble";
+import { useAuth } from "@/context/auth-context";
 import { useChatData } from "@/context/chat-context";
-import { roomMessages } from "@/data/mock-chat";
+import { getRoomMessages, Message, uploadImage } from "@/services/api";
+import { getSocket } from "@/services/socket";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import * as ImagePicker from "expo-image-picker";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ChatRoomScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { user, token, loading: authLoading } = useAuth();
   const { findRoomById } = useChatData();
   const roomId = String(params.id ?? "");
   const room = findRoomById(roomId);
-  const initialMessages = room ? (roomMessages[room.id] ?? []) : [];
-  const [messages, setMessages] = useState(initialMessages);
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
+  const socketRef = useRef<ReturnType<typeof getSocket> | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    if (room) {
-      setMessages(roomMessages[room.id] ?? []);
+    if (!authLoading && !user) {
+      router.replace("/login");
     }
-  }, [room]);
+  }, [authLoading, router, user]);
 
-  const handleSend = () => {
-    const trimmed = draft.trim();
-    if (!trimmed) {
+  useEffect(() => {
+    if (!room || !token) {
       return;
     }
 
-    const newMessage = {
-      id: `${Date.now()}`,
-      roomId,
-      senderName: "You",
-      senderId: "u0",
-      senderInitials: "Y",
-      text: trimmed,
-      sentAt: "Now",
-      isCurrentUser: true,
+    let isMounted = true;
+    setLoadingMessages(true);
+    setStatusMessage(null);
+
+    getRoomMessages(roomId)
+      .then((data) => {
+        if (!isMounted) return;
+        setMessages(
+          data.map((message) => ({
+            ...message,
+            isCurrentUser: message.userId === user?.id,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setStatusMessage("Unable to load messages. Please try again.");
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoadingMessages(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [room, roomId, token, user?.id]);
+
+  useEffect(() => {
+    if (!room || !token) {
+      return;
+    }
+
+    const socket = getSocket(token);
+    socketRef.current = socket;
+
+    const handleNewMessage = (message: Message) => {
+      setMessages((current) => {
+        if (current.some((item) => item.id === message.id)) {
+          return current;
+        }
+
+        return [
+          ...current,
+          {
+            ...message,
+            isCurrentUser: message.userId === user?.id,
+          },
+        ];
+      });
+
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 80);
     };
 
-    setMessages((current) => [...current, newMessage]);
-    setDraft("");
+    const handleRoomPresence = () => {
+      // Room presence is available if needed in the future.
+    };
 
-    setTimeout(() => {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }, 80);
+    socket.on("new-message", handleNewMessage);
+    socket.on("room-presence", handleRoomPresence);
+    socket.emit("join-room", { roomId });
+
+    return () => {
+      socket.off("new-message", handleNewMessage);
+      socket.off("room-presence", handleRoomPresence);
+      socket.emit("leave-room", { roomId });
+    };
+  }, [room, roomId, token, user?.id]);
+
+  const handleSend = () => {
+    const trimmed = draft.trim();
+    if (!trimmed || !socketRef.current) {
+      return;
+    }
+
+    socketRef.current.emit("send-message", {
+      roomId,
+      type: "text",
+      content: trimmed,
+    });
+    setDraft("");
   };
 
-  const handleAttach = () => {
-    Alert.alert("Image picker", "This is a mock picker UI only.");
+  const handleAttach = async () => {
+    if (!socketRef.current) {
+      setStatusMessage("Unable to attach image. Please try again.");
+      return;
+    }
+
+    // Ensure the native ImagePicker module is available in this environment
+    if (!ImagePicker || typeof ImagePicker.requestMediaLibraryPermissionsAsync !== "function") {
+      setStatusMessage(
+        "Image picker is unavailable in this environment. Run on a device or ensure expo-image-picker is installed in your dev client.",
+      );
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setStatusMessage("Photo permission is required to attach images.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: false,
+    });
+
+    const canceled =
+      ("canceled" in result && result.canceled) ||
+      ("cancelled" in result && result.cancelled);
+    if (canceled) {
+      return;
+    }
+
+    const asset = Array.isArray((result as any).assets)
+      ? (result as any).assets[0]
+      : null;
+    const uri = asset?.uri ?? (result as any).uri;
+
+    if (!uri) {
+      setStatusMessage("Unable to read selected image.");
+      return;
+    }
+
+    setStatusMessage(null);
+
+    try {
+      const imageUrl = await uploadImage(uri);
+      socketRef.current.emit("send-message", {
+        roomId,
+        type: "image",
+        imageUrl,
+      });
+    } catch {
+      setStatusMessage("Image upload failed. Please try again.");
+    }
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack?.()) {
+      router.back();
+    } else {
+      router.replace("/rooms");
+    }
   };
 
   if (!room) {
@@ -84,34 +219,57 @@ export default function ChatRoomScreen() {
 
   return (
     <SafeAreaView style={styles.page}>
-      <View style={styles.headerWrapper}>
+      <View style={[styles.headerWrapper, { paddingTop: 12 + insets.top }]}> 
         <Header
           title={room.name}
           subtitle={`${room.online} online • ${room.privacy}`}
-          onBack={() => router.back()}
+          onBack={handleBack}
           rightIcon="ellipsis-vertical"
           onRightPress={() =>
-            Alert.alert("Room options", "Mock room options not implemented.")
+            setStatusMessage("Room options are not available yet.")
           }
         />
       </View>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={100 + insets.top}
       >
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.messageList}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() =>
-            scrollRef.current?.scrollToEnd({ animated: true })
-          }
-        >
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
-        </ScrollView>
+        {loadingMessages ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color="#fff" />
+          </View>
+        ) : messages.length === 0 ? (
+          <ScrollView
+            contentContainerStyle={styles.messageList}
+            showsVerticalScrollIndicator={false}
+          >
+            <EmptyState
+              icon="chatbubbles-outline"
+              title="No messages yet"
+              subtitle="Start the conversation in this room."
+            />
+          </ScrollView>
+        ) : (
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={styles.messageList}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() =>
+              scrollRef.current?.scrollToEnd({ animated: true })
+            }
+          >
+            {messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
+          </ScrollView>
+        )}
+
+        {statusMessage ? (
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>{statusMessage}</Text>
+          </View>
+        ) : null}
 
         <ChatInput
           value={draft}
@@ -169,5 +327,19 @@ const styles = StyleSheet.create({
   backLabel: {
     color: "#fff",
     fontWeight: "700",
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  statusText: {
+    color: "#FBCFE8",
+    fontSize: 13,
+    textAlign: "center",
   },
 });
