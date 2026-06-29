@@ -1,6 +1,7 @@
 import { useAuth } from "@/context/auth-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -19,12 +20,13 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
 
-  if (loading) {
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, user, router]);
 
-  if (!user) {
-    router.replace("/login");
+  if (loading || !user) {
     return null;
   }
 

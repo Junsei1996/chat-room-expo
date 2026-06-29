@@ -3,7 +3,7 @@ import { useAuth } from "@/context/auth-context";
 import { useChatData } from "@/context/chat-context";
 import { categories, RoomCategory, RoomPrivacy } from "@/data/mock-chat";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Pressable,
@@ -25,6 +25,12 @@ export default function CreateRoomScreen() {
   const [privacy, setPrivacy] = useState<RoomPrivacy>("Public");
   const [confirmation, setConfirmation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authLoading, user, router]);
 
   const handleSubmit = async () => {
     if (!name.trim() || !description.trim()) {
@@ -52,7 +58,6 @@ export default function CreateRoomScreen() {
   };
 
   if (!authLoading && !user) {
-    router.replace("/login");
     return null;
   }
 

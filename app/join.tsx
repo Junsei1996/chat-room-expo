@@ -107,8 +107,8 @@ export default function JoinRoomScreen() {
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>Tips</Text>
           <Text style={styles.infoText}>
-            Use codes like LAUNCH, CODEX, FOCUS, PLAY4 or RANDOM to join mock
-            rooms instantly.
+            Room codes are shown on each room card and shared by the room
+            creator. Codes are not case sensitive.
           </Text>
         </View>
       </View>

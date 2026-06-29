@@ -33,6 +33,7 @@ export default function ChatRoomScreen() {
   const [draft, setDraft] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [onlineCount, setOnlineCount] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const socketRef = useRef<ReturnType<typeof getSocket> | null>(null);
   const insets = useSafeAreaInsets();
@@ -49,8 +50,11 @@ export default function ChatRoomScreen() {
     }
 
     let isMounted = true;
+    // Reset UI for the new room before fetching its message history.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingMessages(true);
     setStatusMessage(null);
+    setOnlineCount(null);
 
     getRoomMessages(roomId)
       .then((data) => {
@@ -104,8 +108,13 @@ export default function ChatRoomScreen() {
       }, 80);
     };
 
-    const handleRoomPresence = () => {
-      // Room presence is available if needed in the future.
+    const handleRoomPresence = (payload: {
+      roomId: string;
+      onlineCount: number;
+    }) => {
+      if (payload.roomId === roomId) {
+        setOnlineCount(payload.onlineCount);
+      }
     };
 
     socket.on("new-message", handleNewMessage);
@@ -154,7 +163,7 @@ export default function ChatRoomScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.7,
       allowsEditing: false,
     });
@@ -222,7 +231,7 @@ export default function ChatRoomScreen() {
       <View style={[styles.headerWrapper, { paddingTop: 12 + insets.top }]}> 
         <Header
           title={room.name}
-          subtitle={`${room.online} online • ${room.privacy}`}
+          subtitle={`${onlineCount ?? room.online} online • ${room.privacy}`}
           onBack={handleBack}
           rightIcon="ellipsis-vertical"
           onRightPress={() =>

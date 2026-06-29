@@ -46,6 +46,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const text = message.content;
   const timestamp = formatTimestamp(message.createdAt);
 
+  const avatar = (
+    <View
+      style={[
+        styles.avatar,
+        isCurrentUser ? styles.avatarRight : styles.avatarLeft,
+      ]}
+    >
+      <Text style={styles.avatarText}>{initials}</Text>
+    </View>
+  );
+
   return (
     <View
       style={[
@@ -53,6 +64,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         isCurrentUser ? styles.containerRight : styles.containerLeft,
       ]}
     >
+      {!isCurrentUser ? avatar : null}
       <View
         style={[
           styles.bubble,
@@ -84,14 +96,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {timestamp}
         </Text>
       </View>
-      <View
-        style={[
-          styles.avatar,
-          isCurrentUser ? styles.avatarRight : styles.avatarLeft,
-        ]}
-      >
-        <Text style={styles.avatarText}>{initials}</Text>
-      </View>
+      {isCurrentUser ? avatar : null}
     </View>
   );
 }

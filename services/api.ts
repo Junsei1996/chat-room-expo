@@ -1,16 +1,15 @@
 import { RoomCategory, RoomPrivacy } from "@/data/mock-chat";
-import { create } from "axios";
-import { Platform } from "react-native";
+import axios from "axios";
 
-const LOCAL_API =
-  Platform.OS === "android"
-    ? "http://192.168.0.105:4000" // Android emulator
-    : __DEV__
-      ? "http://192.168.0.105:4000" // Development on simulator/web
-      : "http://192.168.0.105:4000"; // Production or physical device - CHANGE THIS TO YOUR MACHINE'S IP
-export const API_BASE_URL = LOCAL_API;
+// Local LAN address used during development (simulator / device on same network).
+// Change this to your machine's IP when testing on a physical device.
+const DEV_API_URL = "http://192.168.0.105:4000";
 
-export const api = create({
+// In production builds set EXPO_PUBLIC_API_URL to your deployed backend URL
+// (e.g. https://api.yourdomain.com). It is inlined by Expo at build time.
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? DEV_API_URL;
+
+export const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
   timeout: 10000,
   headers: {

@@ -32,7 +32,10 @@ export default function RoomsScreen() {
   }, [authLoading, router, user]);
 
   useEffect(() => {
-    refreshRooms(search, category);
+    const handle = setTimeout(() => {
+      refreshRooms(search, category);
+    }, 300);
+    return () => clearTimeout(handle);
   }, [search, category, refreshRooms]);
 
   return (
@@ -91,7 +94,7 @@ export default function RoomsScreen() {
           </Pressable>
         </View>
 
-        {authLoading ? (
+        {authLoading || (loading && rooms.length === 0) ? (
           <View style={styles.loadingCard}>
             <ActivityIndicator color="#fff" />
           </View>
